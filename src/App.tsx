@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import WebApp from "@twa-dev/sdk";
+import { supabase } from "./supabase";
 
 type Page = "home" | "daily" | "battle";
 
@@ -10,41 +11,78 @@ export default function App() {
   const [savedNick, setSavedNick] = useState("");
   const [answer, setAnswer] = useState("");
   const [score, setScore] = useState<number>(0);
+  const [loading, setLoading] = useState(true);
 
   const CORRECT_ANSWER = "ЕЕИУ";
 
   useEffect(() => {
-    WebApp.ready();
-    WebApp.expand();
+    const init = async () => {
+      WebApp.ready();
+      WebApp.expand();
 
-    const user = WebApp.initDataUnsafe?.user;
-    setTgUser(user);
+      const user = WebApp.initDataUnsafe?.user;
+      if (!user) return;
 
-    const storedNick = localStorage.getItem("nickname");
-    const storedScore = localStorage.getItem("score");
+      setTgUser(user);
 
-    if (storedNick) setSavedNick(storedNick);
-    if (storedScore) setScore(Number(storedScore));
+      // Проверяем есть ли пользователь в базе
+      const { data } = await supabase
+        .from("users")
+        .select("*")
+        .eq("telegram_id", user.id)
+        .single();
+
+      if (data) {
+        setSavedNick(data.nickname);
+        setScore(data.score);
+      }
+
+      setLoading(false);
+    };
+
+    init();
   }, []);
 
-  const handleSaveNick = () => {
-    if (!nickname.trim()) return;
-    localStorage.setItem("nickname", nickname);
-    localStorage.setItem("score", "0");
-    setSavedNick(nickname);
-    setScore(0);
+  const handleSaveNick = async () => {
+    if (!nickname.trim() || !tgUser) return;
+
+    const { data } = await supabase
+      .from("users")
+      .insert([
+        {
+          telegram_id: tgUser.id,
+          nickname: nickname,
+          score: 0,
+        },
+      ])
+      .select()
+      .single();
+
+    if (data) {
+      setSavedNick(data.nickname);
+      setScore(data.score);
+    }
   };
 
-  const checkAnswer = () => {
+  const checkAnswer = async () => {
+    if (!tgUser) return;
+
     if (answer.toUpperCase() === CORRECT_ANSWER) {
       const newScore = score + 1;
+
+      await supabase
+        .from("users")
+        .update({ score: newScore })
+        .eq("telegram_id", tgUser.id);
+
       setScore(newScore);
-      localStorage.setItem("score", newScore.toString());
       alert("Верно! +1 очко");
     } else {
       alert("Неверно, попробуй ещё");
     }
   };
+
+  if (loading) return <div style={{ padding: 20 }}>Загрузка...</div>;
 
   return (
     <div style={{ padding: 20 }}>
@@ -69,7 +107,7 @@ export default function App() {
         </div>
       )}
 
-      {/* 🔐 Авторизация */}
+      {/* 🔐 Регистрация */}
       {!savedNick && (
         <div>
           <h2>Введите ник</h2>
@@ -86,11 +124,6 @@ export default function App() {
         <>
           <h1>🎮 KL5 Battle</h1>
 
-          <h2>🏆 Топ игроков (временно локальный)</h2>
-          <ul>
-            <li>{savedNick} — {score}</li>
-          </ul>
-
           <button onClick={() => setPage("daily")}>
             📘 Ежедневные задания
           </button>
@@ -103,7 +136,7 @@ export default function App() {
         </>
       )}
 
-      {/* 📘 Ежедневное задание */}
+      {/* 📘 Задание */}
       {page === "daily" && (
         <>
           <button onClick={() => setPage("home")}>⬅ Назад</button>
@@ -130,15 +163,14 @@ export default function App() {
         </>
       )}
 
-      {/* ⚔ Баттл (заглушка) */}
+      {/* ⚔ Баттл */}
       {page === "battle" && (
         <>
           <button onClick={() => setPage("home")}>⬅ Назад</button>
           <h2>Поиск соперников...</h2>
-          <p>Система матчмейкинга будет добавлена позже.</p>
+          <p>Система баттлов скоро появится.</p>
         </>
       )}
-
     </div>
   );
 }
