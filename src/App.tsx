@@ -16,36 +16,35 @@ export default function App() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [currentTask, setCurrentTask] = useState<Task | null>(null);
 
-  // Загрузка пользователя
+  // Инициализация
   useEffect(() => {
-  const init = async () => {
-    WebApp.ready();
-    WebApp.expand();
-    const user = WebApp.initDataUnsafe?.user;
-    if (!user) return;
-    setTgUser(user);
+    const init = async () => {
+      WebApp.ready();
+      WebApp.expand();
+      const user = WebApp.initDataUnsafe?.user;
+      if (!user) return;
+      setTgUser(user);
 
-    // Проверяем есть ли пользователь в базе
-    const { data } = await supabase
-      .from("users")
-      .select("*")
-      .eq("telegram_id", user.id)
-      .single();
+      // Проверяем пользователя
+      const { data } = await supabase
+        .from("users")
+        .select("*")
+        .eq("telegram_id", user.id)
+        .single();
 
-    if (data) {
-      setSavedNick(data.nickname);
-      setScore(data.score);
-    }
+      if (data) {
+        setSavedNick(data.nickname);
+        setScore(data.score);
+      }
 
-    // Загрузка топа и всех заданий
-    await loadTopPlayers();
-    await loadTasks();
+      // Загружаем топ игроков и задания
+      await loadTopPlayers();
+      await loadTasks();
 
-    setLoading(false);
-  };
-  init();
-}, []);
-
+      setLoading(false);
+    };
+    init();
+  }, []);
 
   const loadTopPlayers = async () => {
     const { data, error } = await supabase
@@ -86,13 +85,16 @@ export default function App() {
   const handleAnswered = async () => {
     // Увеличиваем очки
     const newScore = score + 1;
-    await supabase.from("users").update({ score: newScore }).eq("telegram_id", tgUser.id);
-    setScore(newScore);
+    if (tgUser) {
+      await supabase.from("users").update({ score: newScore }).eq("telegram_id", tgUser.id);
+      setScore(newScore);
+    }
 
     // Помечаем задание как использованное
     if (currentTask) {
       const updatedTasks = tasks.map(t => (t.id === currentTask.id ? { ...t, used: true } : t));
       setTasks(updatedTasks);
+      await supabase.from("tasks").update({ used: true }).eq("id", currentTask.id);
     }
 
     // Обновляем топ
@@ -123,14 +125,24 @@ export default function App() {
       {savedNick && page === "home" && !currentTask && (
         <>
           <h1 style={{ fontSize: 48 }}>persikbattle</h1>
-          <button onClick={() => { setPage("daily"); nextTask(); }} style={{ margin: 10, padding: "15px 40px", borderRadius: 25, fontSize: 20 }}>📘 Ежедневные задания</button>
+          <button
+            onClick={() => { setPage("daily"); nextTask(); }}
+            style={{ margin: 10, padding: "15px 50px", borderRadius: 25, fontSize: 20 }}
+          >
+            📘 Ежедневные задания
+          </button>
           <br />
-          <button onClick={() => setPage("battle")} style={{ margin: 10, padding: "15px 40px", borderRadius: 25, fontSize: 20 }}>⚔ Батл 2 на 2</button>
+          <button
+            onClick={() => setPage("battle")}
+            style={{ margin: 10, padding: "15px 50px", borderRadius: 25, fontSize: 20 }}
+          >
+            ⚔ Батл 2 на 2
+          </button>
 
           <h2>🏆 Топ игроков</h2>
           <ol>
             {topPlayers.map((p, i) => (
-              <li key={i}>{p.nickname} — {p.score}</li>
+              <li key={i}>{i + 1}. {p.nickname} — {p.score}</li>
             ))}
           </ol>
         </>

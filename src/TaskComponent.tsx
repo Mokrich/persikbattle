@@ -1,75 +1,103 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
-export type Task = {
+export interface Task {
   id: number;
-  words: string[]; // ["Алфавит", "Документ", ...]
-  correct: string[]; // ["АлфАвит", "ДокУмент", ...]
-};
+  words: string;
+  correct: string;
+  used: boolean;
+  type: number;
+}
 
-type Props = {
+interface Props {
   task: Task;
   onAnswered: () => void;
-};
+}
 
 export default function TaskComponent({ task, onAnswered }: Props) {
-  const [selected, setSelected] = useState<string[]>(Array(task.words.length).fill(""));
+  const [words, setWords] = useState<string[][]>([]);
+  const [correctWords, setCorrectWords] = useState<string[]>([]);
+  const [selected, setSelected] = useState<{ [key: string]: string }>({});
+  const [answered, setAnswered] = useState(false);
 
-  const handleLetterClick = (wordIndex: number, letterIndex: number) => {
-    const word = task.words[wordIndex];
-    const newSelected = [...selected];
-    const newWord = word
-      .split("")
-      .map((l, i) => (i === letterIndex ? l.toUpperCase() : l.toLowerCase()))
-      .join("");
-    newSelected[wordIndex] = newWord;
-    setSelected(newSelected);
+  // Разбираем слова на буквы с индексами
+  useEffect(() => {
+    const wArr = task.words.split(",");
+    const cArr = task.correct.split(",");
+    setCorrectWords(cArr);
+
+    const lettersArr: string[][] = wArr.map(word => {
+      const counts: { [key: string]: number } = {};
+      return word.split("").map(letter => {
+        if ("аеёиоуыэюяАЕЁИОУЫЭЮЯ".includes(letter.toLowerCase())) {
+          counts[letter] = (counts[letter] || 0) + 1;
+          return letter + counts[letter]; // индексируем повторяющиеся гласные
+        }
+        return letter;
+      });
+    });
+
+    setWords(lettersArr);
+    setSelected({});
+    setAnswered(false);
+  }, [task]);
+
+  const handleClick = (wordIndex: number, letterIndex: number, letter: string) => {
+    if (answered) return;
+
+    const key = `${wordIndex}_${letterIndex}`;
+    setSelected(prev => ({ ...prev, [key]: letter }));
   };
 
   const handleCheck = () => {
-    alert(
-      task.correct
-        .map((w, i) => `${w}`)
-        .join(" ")
-    );
-    onAnswered();
+    setAnswered(true);
   };
 
   return (
-    <div style={{ padding: 20, textAlign: "center" }}>
-      <h2>Поставьте знак ударения</h2>
-      {task.words.map((word, wIndex) => (
-        <div key={wIndex} style={{ marginBottom: 10 }}>
-          {word.split("").map((letter, lIndex) => (
-            <button
-              key={lIndex}
-              onClick={() => handleLetterClick(wIndex, lIndex)}
-              style={{
-                margin: 2,
-                padding: "5px 10px",
-                borderRadius: 5,
-                fontWeight:
-                  selected[wIndex][lIndex] === letter.toUpperCase() ? "bold" : "normal",
-                textTransform: "uppercase",
-              }}
-            >
-              {letter}
-            </button>
-          ))}
-        </div>
-      ))}
+    <div style={{ marginTop: 20 }}>
+      <h2>Поставьте знак ударения в следующих словах:</h2>
+      <div style={{ display: "flex", flexDirection: "column", gap: 15, marginTop: 20 }}>
+        {words.map((wordLetters, wi) => (
+          <div key={wi} style={{ display: "flex", gap: 5, justifyContent: "center" }}>
+            {wordLetters.map((letter, li) => {
+              const baseLetter = letter.replace(/[0-9]/g, "");
+              const isSelected = Object.values(selected).includes(letter);
+              const isCorrect = answered && task.correct[wi].includes(baseLetter.toUpperCase());
+              return (
+                <button
+                  key={li}
+                  onClick={() => handleClick(wi, li, letter)}
+                  style={{
+                    padding: 5,
+                    minWidth: 25,
+                    fontWeight: isCorrect ? "bold" : "normal",
+                    color: isCorrect ? "red" : isSelected ? "blue" : "black",
+                  }}
+                >
+                  {answered && isCorrect ? baseLetter.toUpperCase() : baseLetter}
+                </button>
+              );
+            })}
+          </div>
+        ))}
+      </div>
 
-      <button
-        onClick={handleCheck}
-        style={{
-          marginTop: 20,
-          padding: "10px 20px",
-          borderRadius: 25,
-          fontSize: 18,
-          display: selected.some(s => s !== "") ? "block" : "none",
-        }}
-      >
-        Проверить
-      </button>
+      {!answered && (
+        <button
+          onClick={handleCheck}
+          style={{ marginTop: 20, padding: "10px 30px", borderRadius: 15, fontSize: 18 }}
+        >
+          Проверить
+        </button>
+      )}
+
+      {answered && (
+        <button
+          onClick={onAnswered}
+          style={{ marginTop: 20, padding: "10px 30px", borderRadius: 15, fontSize: 18 }}
+        >
+          Следующее задание
+        </button>
+      )}
     </div>
   );
 }
