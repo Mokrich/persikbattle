@@ -16,36 +16,37 @@ export default function App() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [currentTask, setCurrentTask] = useState<Task | null>(null);
 
-  // Инициализация
+  // Инициализация WebApp и пользователя
   useEffect(() => {
     const init = async () => {
       WebApp.ready();
       WebApp.expand();
+
       const user = WebApp.initDataUnsafe?.user;
       if (!user) return;
       setTgUser(user);
 
-      // Проверяем пользователя
-      const { data } = await supabase
+      // Загружаем пользователя
+      const { data: userData } = await supabase
         .from("users")
         .select("*")
         .eq("telegram_id", user.id)
         .single();
 
-      if (data) {
-        setSavedNick(data.nickname);
-        setScore(data.score);
+      if (userData) {
+        setSavedNick(userData.nickname);
+        setScore(userData.score);
       }
 
-      // Загружаем топ игроков и задания
       await loadTopPlayers();
-      await loadTasks();
+      await loadTasks(); // После этого nextTask вызовется внутри loadTasks
 
       setLoading(false);
     };
     init();
   }, []);
 
+  // Загрузка топа игроков
   const loadTopPlayers = async () => {
     const { data, error } = await supabase
       .from("users")
@@ -56,12 +57,25 @@ export default function App() {
     else setTopPlayers(data || []);
   };
 
+  // Загрузка всех заданий
   const loadTasks = async () => {
     const { data, error } = await supabase.from("tasks").select("*");
     if (error) console.error(error.message);
-    else setTasks(data || []);
+    else {
+      const cleaned = (data || []).map(t => ({
+        ...t,
+        words: t.words?.trim() || "",
+        correct: t.correct?.trim() || "",
+        used: t.used || false,
+      }));
+      setTasks(cleaned);
+
+      // сразу выбираем первое задание
+      nextTask(cleaned);
+    }
   };
 
+  // Сохраняем никнейм
   const handleSaveNick = async () => {
     if (!nickname.trim() || !tgUser) return;
 
@@ -74,34 +88,33 @@ export default function App() {
     if (data) setSavedNick(data.nickname);
   };
 
-  const nextTask = () => {
-    if (tasks.length === 0) return;
-    const remaining = tasks.filter(t => !t.used);
+  // Выбираем следующее задание
+  const nextTask = (taskList: Task[] = tasks) => {
+    const remaining = taskList.filter(t => !t.used);
     if (remaining.length === 0) return alert("Все задания пройдены!");
     const t = remaining[Math.floor(Math.random() * remaining.length)];
     setCurrentTask(t);
   };
 
+  // Обработка ответа
   const handleAnswered = async () => {
+    if (!tgUser || !currentTask) return;
+
     // Увеличиваем очки
     const newScore = score + 1;
-    if (tgUser) {
-      await supabase.from("users").update({ score: newScore }).eq("telegram_id", tgUser.id);
-      setScore(newScore);
-    }
+    await supabase.from("users").update({ score: newScore }).eq("telegram_id", tgUser.id);
+    setScore(newScore);
 
     // Помечаем задание как использованное
-    if (currentTask) {
-      const updatedTasks = tasks.map(t => (t.id === currentTask.id ? { ...t, used: true } : t));
-      setTasks(updatedTasks);
-      await supabase.from("tasks").update({ used: true }).eq("id", currentTask.id);
-    }
+    await supabase.from("tasks").update({ used: true }).eq("id", currentTask.id);
+    const updatedTasks = tasks.map(t => (t.id === currentTask.id ? { ...t, used: true } : t));
+    setTasks(updatedTasks);
 
     // Обновляем топ
     await loadTopPlayers();
 
-    // Убираем задание
-    setCurrentTask(null);
+    // Переходим к следующему заданию
+    nextTask(updatedTasks);
   };
 
   if (loading) return <div style={{ padding: 20 }}>Загрузка...</div>;
@@ -125,24 +138,14 @@ export default function App() {
       {savedNick && page === "home" && !currentTask && (
         <>
           <h1 style={{ fontSize: 48 }}>persikbattle</h1>
-          <button
-            onClick={() => { setPage("daily"); nextTask(); }}
-            style={{ margin: 10, padding: "15px 50px", borderRadius: 25, fontSize: 20 }}
-          >
-            📘 Ежедневные задания
-          </button>
+          <button onClick={() => { setPage("daily"); nextTask(); }} style={{ margin: 10, padding: "15px 40px", borderRadius: 25, fontSize: 20 }}>📘 Ежедневные задания</button>
           <br />
-          <button
-            onClick={() => setPage("battle")}
-            style={{ margin: 10, padding: "15px 50px", borderRadius: 25, fontSize: 20 }}
-          >
-            ⚔ Батл 2 на 2
-          </button>
+          <button onClick={() => setPage("battle")} style={{ margin: 10, padding: "15px 40px", borderRadius: 25, fontSize: 20 }}>⚔ Батл 2 на 2</button>
 
           <h2>🏆 Топ игроков</h2>
           <ol>
             {topPlayers.map((p, i) => (
-              <li key={i}>{i + 1}. {p.nickname} — {p.score}</li>
+              <li key={i}>{p.nickname} — {p.score}</li>
             ))}
           </ol>
         </>
