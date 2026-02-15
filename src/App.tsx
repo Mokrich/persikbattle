@@ -4,6 +4,11 @@ import { supabase } from "./supabase";
 
 type Page = "home" | "daily" | "battle";
 
+interface Player {
+  nickname: string;
+  score: number;
+}
+
 export default function App() {
   const [page, setPage] = useState<Page>("home");
   const [tgUser, setTgUser] = useState<any>(null);
@@ -11,10 +16,14 @@ export default function App() {
   const [savedNick, setSavedNick] = useState("");
   const [answer, setAnswer] = useState("");
   const [score, setScore] = useState<number>(0);
+  const [topPlayers, setTopPlayers] = useState<Player[]>([]);
   const [loading, setLoading] = useState(true);
 
   const CORRECT_ANSWER = "ЕЕИУ";
 
+  // -------------------------------
+  // Инициализация пользователя
+  // -------------------------------
   useEffect(() => {
     const init = async () => {
       WebApp.ready();
@@ -25,7 +34,7 @@ export default function App() {
 
       setTgUser(user);
 
-      // Проверяем есть ли пользователь в базе
+      // Проверяем, есть ли пользователь в базе
       const { data } = await supabase
         .from("users")
         .select("*")
@@ -37,33 +46,59 @@ export default function App() {
         setScore(data.score);
       }
 
+      // Загружаем топ после установки пользователя
+      await loadTopPlayers();
+
       setLoading(false);
     };
 
     init();
   }, []);
 
+  // -------------------------------
+  // Функция для загрузки топа
+  // -------------------------------
+  const loadTopPlayers = async () => {
+    const { data, error } = await supabase
+      .from("users")
+      .select("nickname, score")
+      .order("score", { ascending: false })
+      .limit(10);
+
+    if (error) {
+      console.error("Ошибка загрузки топа:", error.message);
+    } else {
+      setTopPlayers(data);
+    }
+  };
+
+  // -------------------------------
+  // Регистрация нового игрока
+  // -------------------------------
   const handleSaveNick = async () => {
     if (!nickname.trim() || !tgUser) return;
 
+    // Вставка или обновление
     const { data } = await supabase
       .from("users")
-      .insert([
-        {
-          telegram_id: tgUser.id,
-          nickname: nickname,
-          score: 0,
-        },
-      ])
+      .upsert({
+        telegram_id: tgUser.id,
+        nickname: nickname,
+        score: 0,
+      })
       .select()
       .single();
 
     if (data) {
       setSavedNick(data.nickname);
       setScore(data.score);
+      await loadTopPlayers(); // обновляем топ после регистрации
     }
   };
 
+  // -------------------------------
+  // Проверка ответа на задание
+  // -------------------------------
   const checkAnswer = async () => {
     if (!tgUser) return;
 
@@ -77,6 +112,8 @@ export default function App() {
 
       setScore(newScore);
       alert("Верно! +1 очко");
+
+      await loadTopPlayers(); // обновляем топ после начисления очков
     } else {
       alert("Неверно, попробуй ещё");
     }
@@ -124,6 +161,7 @@ export default function App() {
         <>
           <h1>🎮 KL5 Battle</h1>
 
+          {/* Кнопки */}
           <button onClick={() => setPage("daily")}>
             📘 Ежедневные задания
           </button>
@@ -133,6 +171,14 @@ export default function App() {
           <button onClick={() => setPage("battle")}>
             ⚔ Батл 2 на 2
           </button>
+
+          {/* 🔥 Глобальный топ */}
+          <h2>🏆 Топ игроков</h2>
+          <ul>
+            {topPlayers.map((player, index) => (
+              <li key={index}>{player.nickname} — {player.score}</li>
+            ))}
+          </ul>
         </>
       )}
 
