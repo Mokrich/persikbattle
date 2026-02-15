@@ -10,8 +10,6 @@ interface Player {
 }
 
 export default function App() {
-  const [showResult, setShowResult] = useState(false);
-  const [isCorrect, setIsCorrect] = useState(false);
   const [page, setPage] = useState<Page>("home");
   const [tgUser, setTgUser] = useState<any>(null);
   const [nickname, setNickname] = useState("");
@@ -21,10 +19,13 @@ export default function App() {
   const [topPlayers, setTopPlayers] = useState<Player[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const [showResult, setShowResult] = useState(false);
+  const [isCorrect, setIsCorrect] = useState(false);
+
   const CORRECT_ANSWER = "ЕЕИУ";
-  
+
   // -------------------------------
-  // Инициализация пользователя
+  // Инициализация
   // -------------------------------
   useEffect(() => {
     const init = async () => {
@@ -36,7 +37,6 @@ export default function App() {
 
       setTgUser(user);
 
-      // Проверяем, есть ли пользователь в базе
       const { data } = await supabase
         .from("users")
         .select("*")
@@ -48,50 +48,41 @@ export default function App() {
         setScore(data.score);
       }
 
-      // Загружаем топ после установки пользователя
       await loadTopPlayers();
-
       setLoading(false);
-    // Автообновление топа каждые 10 секунд
-const interval = setInterval(() => {
-  loadTopPlayers();
-}, 10000);
-
-return () => clearInterval(interval);
-};
+    };
 
     init();
+
+    // автообновление топа каждые 10 секунд
+    const interval = setInterval(() => loadTopPlayers(), 10000);
+    return () => clearInterval(interval);
   }, []);
 
   // -------------------------------
-  // Функция для загрузки топа
+  // Функция загрузки топа
   // -------------------------------
   const loadTopPlayers = async () => {
     const { data, error } = await supabase
       .from("users")
       .select("nickname, score")
-      .order("score", { ascending: false })
-      .limit(10);
+      .order("score", { ascending: false });
 
-    if (error) {
-      console.error("Ошибка загрузки топа:", error.message);
-    } else {
-      setTopPlayers(data);
-    }
+    if (error) console.error("Ошибка загрузки топа:", error.message);
+    else setTopPlayers(data);
   };
 
   // -------------------------------
-  // Регистрация нового игрока
+  // Регистрация
   // -------------------------------
   const handleSaveNick = async () => {
     if (!nickname.trim() || !tgUser) return;
 
-    // Вставка или обновление
     const { data } = await supabase
       .from("users")
       .upsert({
         telegram_id: tgUser.id,
-        nickname: nickname,
+        nickname,
         score: 0,
       })
       .select()
@@ -100,40 +91,56 @@ return () => clearInterval(interval);
     if (data) {
       setSavedNick(data.nickname);
       setScore(data.score);
-      await loadTopPlayers(); // обновляем топ после регистрации
+      await loadTopPlayers();
     }
   };
 
   // -------------------------------
-  // Проверка ответа на задание
+  // Проверка ответа
   // -------------------------------
   const checkAnswer = async () => {
-  if (!tgUser || showResult) return;
+    if (!tgUser || showResult) return;
 
-  const correct = answer.toUpperCase() === CORRECT_ANSWER;
-  setIsCorrect(correct);
-  setShowResult(true);
+    const correct = answer.toUpperCase() === CORRECT_ANSWER;
+    setIsCorrect(correct);
+    setShowResult(true);
 
-  if (correct) {
-    const newScore = score + 1;
-
-    await supabase
-      .from("users")
-      .update({ score: newScore })
-      .eq("telegram_id", tgUser.id);
-
-    setScore(newScore);
-    await loadTopPlayers();
-  }
-};
-
+    if (correct) {
+      const newScore = score + 1;
+      await supabase
+        .from("users")
+        .update({ score: newScore })
+        .eq("telegram_id", tgUser.id);
+      setScore(newScore);
+      await loadTopPlayers();
+    }
+  };
 
   if (loading) return <div style={{ padding: 20 }}>Загрузка...</div>;
 
-  return (
-    <div style={{ padding: 20 }}>
+  // -------------------------------
+  // Стили
+  // -------------------------------
+  const centerStyle = { display: "flex", flexDirection: "column", alignItems: "center" };
+  const buttonStyle = {
+    padding: "12px 24px",
+    borderRadius: 30,
+    border: "none",
+    margin: "10px 0",
+    fontSize: 18,
+    fontWeight: "bold",
+    cursor: "pointer",
+    background: "linear-gradient(135deg, #a78bfa, #8b5cf6)",
+    color: "white",
+    width: "220px",
+    textAlign: "center",
+    transition: "transform 0.2s",
+  } as const;
 
-      {/* 🔝 Верхняя панель */}
+  return (
+    <div style={{ padding: 20, minHeight: "100vh", ...centerStyle, background: "linear-gradient(135deg, #ffffff, #f3e8ff, #e9d5ff, #d8b4fe)" }}>
+      
+      {/* Верхняя панель */}
       {savedNick && (
         <div style={{
           position: "absolute",
@@ -144,115 +151,102 @@ return () => clearInterval(interval);
           alignItems: "center"
         }}>
           {tgUser?.photo_url && (
-            <img
-              src={tgUser.photo_url}
-              style={{ width: 40, height: 40, borderRadius: "50%" }}
-            />
+            <img src={tgUser.photo_url} style={{ width: 40, height: 40, borderRadius: "50%" }} />
           )}
           <span>{savedNick} | ⭐ {score}</span>
         </div>
       )}
 
-      {/* 🔐 Регистрация */}
+      {/* Регистрация */}
       {!savedNick && (
-        <div>
+        <div style={centerStyle}>
           <h2>Введите ник</h2>
           <input
             value={nickname}
             onChange={(e) => setNickname(e.target.value)}
+            style={{ padding: "10px", fontSize: 16, borderRadius: 8, marginBottom: 10 }}
           />
-          <button onClick={handleSaveNick}>Сохранить</button>
+          <button style={buttonStyle} onClick={handleSaveNick}>Сохранить</button>
         </div>
       )}
 
-      {/* 🏠 Главная */}
+      {/* Главная */}
       {savedNick && page === "home" && (
-        <>
-          <h1>🎮 persikbattle</h1>
+        <div style={centerStyle}>
+          <h1 style={{ fontSize: 36, marginBottom: 30 }}>persikbattle</h1>
 
+          <button style={buttonStyle} onClick={() => { setPage("daily"); setShowResult(false); setAnswer(""); }}>📘 Ежедневные задания</button>
+          <button style={buttonStyle} onClick={() => setPage("battle")}>⚔ Батл 2 на 2</button>
 
-          {/* Кнопки */}
-          <button onClick={() => {
-            setPage("daily");
-            setShowResult(false);
-            setAnswer("");
-           }}>
-
-            📘 Ежедневные задания
-          </button>
-
-          <br /><br />
-
-          <button onClick={() => setPage("battle")}>
-            ⚔ Батл 2 на 2
-          </button>
-
-          {/* 🔥 Глобальный топ */}
-          <h2>🏆 Топ игроков</h2>
-          <ul>
+          {/* Топ игроков */}
+          <h2 style={{ marginTop: 30 }}>🏆 Рейтинг игроков</h2>
+          <div style={{ width: "100%", maxWidth: 400 }}>
             {topPlayers.map((player, index) => (
-              <li key={index}>{player.nickname} — {player.score}</li>
+              <div key={index} style={{
+                display: "flex",
+                justifyContent: "space-between",
+                background: "#ffffffaa",
+                padding: "8px 12px",
+                borderRadius: 8,
+                margin: "4px 0",
+                fontWeight: "bold",
+              }}>
+                <span>{index + 1}. {player.nickname}</span>
+                <span>⭐ {player.score}</span>
+              </div>
             ))}
-          </ul>
-        </>
+          </div>
+        </div>
       )}
 
-      {/* 📘 Задание */}
+      {/* Ежедневное задание */}
       {page === "daily" && (
-        <>
-          <button onClick={() => setPage("home")}>⬅ Назад</button>
+        <div style={centerStyle}>
+          <button style={{ ...buttonStyle, width: 120 }} onClick={() => setPage("home")}>⬅ Назад</button>
 
           <h2>Ежедневное задание</h2>
-
-          <p>
-            Поставьте знак ударения в следующих словах 
-(в поле ответа запишите последовательность полученных ударных букв без знаков препинания, например: ЕОИ)
-
-          </p>
-
-          <p style={{ fontWeight: "bold" }}>
-            документ, цемент, руководить, каучук
+          <p style={{ textAlign: "center" }}>
+            Поставьте знак ударения в следующих словах
+            (в поле ответа запишите последовательность полученных ударных букв без знаков препинания, например: ЕОИ)
           </p>
 
           <input
             value={answer}
             onChange={(e) => setAnswer(e.target.value)}
             placeholder="Введите ответ"
+            style={{ padding: "10px", fontSize: 16, borderRadius: 8, marginTop: 10 }}
           />
 
-          {!showResult && (
-  <button onClick={checkAnswer}>Проверить</button>
-)}
-{showResult && (
-  <div style={{
-    marginTop: 20,
-    padding: 15,
-    borderRadius: 12,
-    background: "#ffffffaa"
-  }}>
-    {isCorrect ? (
-      <p style={{ color: "green" }}>
-        ✅ Верно! +1 очко
-      </p>
-    ) : (
-      <p style={{ color: "red" }}>
-        ❌ Неверно. Правильный ответ: {CORRECT_ANSWER}
-      </p>
-    )}
-  </div>
-)}
+          {!showResult && <button style={buttonStyle} onClick={checkAnswer}>Проверить</button>}
 
-        </>
+          {showResult && (
+            <div style={{
+              marginTop: 20,
+              padding: 15,
+              borderRadius: 12,
+              background: "#ffffffaa",
+              minWidth: 200,
+              textAlign: "center"
+            }}>
+              {isCorrect ? (
+                <p style={{ color: "green" }}>✅ Верно! +1 очко</p>
+              ) : (
+                <p style={{ color: "red" }}>❌ Неверно. Правильный ответ: {CORRECT_ANSWER}</p>
+              )}
+            </div>
+          )}
+        </div>
       )}
 
-      {/* ⚔ Баттл */}
+      {/* Батл */}
       {page === "battle" && (
-        <>
-          <button onClick={() => setPage("home")}>⬅ Назад</button>
+        <div style={centerStyle}>
+          <button style={{ ...buttonStyle, width: 120 }} onClick={() => setPage("home")}>⬅ Назад</button>
           <h2>Поиск соперников...</h2>
           <p>Система баттлов скоро появится.</p>
-        </>
+        </div>
       )}
+
     </div>
   );
 }
