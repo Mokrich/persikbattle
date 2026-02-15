@@ -10,6 +10,8 @@ interface Player {
 }
 
 export default function App() {
+  const [showResult, setShowResult] = useState(false);
+  const [isCorrect, setIsCorrect] = useState(false);
   const [page, setPage] = useState<Page>("home");
   const [tgUser, setTgUser] = useState<any>(null);
   const [nickname, setNickname] = useState("");
@@ -20,7 +22,7 @@ export default function App() {
   const [loading, setLoading] = useState(true);
 
   const CORRECT_ANSWER = "ЕЕИУ";
-
+  
   // -------------------------------
   // Инициализация пользователя
   // -------------------------------
@@ -50,7 +52,13 @@ export default function App() {
       await loadTopPlayers();
 
       setLoading(false);
-    };
+    // Автообновление топа каждые 10 секунд
+const interval = setInterval(() => {
+  loadTopPlayers();
+}, 10000);
+
+return () => clearInterval(interval);
+};
 
     init();
   }, []);
@@ -100,24 +108,25 @@ export default function App() {
   // Проверка ответа на задание
   // -------------------------------
   const checkAnswer = async () => {
-    if (!tgUser) return;
+  if (!tgUser || showResult) return;
 
-    if (answer.toUpperCase() === CORRECT_ANSWER) {
-      const newScore = score + 1;
+  const correct = answer.toUpperCase() === CORRECT_ANSWER;
+  setIsCorrect(correct);
+  setShowResult(true);
 
-      await supabase
-        .from("users")
-        .update({ score: newScore })
-        .eq("telegram_id", tgUser.id);
+  if (correct) {
+    const newScore = score + 1;
 
-      setScore(newScore);
-      alert("Верно! +1 очко");
+    await supabase
+      .from("users")
+      .update({ score: newScore })
+      .eq("telegram_id", tgUser.id);
 
-      await loadTopPlayers(); // обновляем топ после начисления очков
-    } else {
-      alert("Неверно, попробуй ещё");
-    }
-  };
+    setScore(newScore);
+    await loadTopPlayers();
+  }
+};
+
 
   if (loading) return <div style={{ padding: 20 }}>Загрузка...</div>;
 
@@ -159,10 +168,16 @@ export default function App() {
       {/* 🏠 Главная */}
       {savedNick && page === "home" && (
         <>
-          <h1>🎮 KL5 Battle</h1>
+          <h1>🎮 persikbattle</h1>
+
 
           {/* Кнопки */}
-          <button onClick={() => setPage("daily")}>
+          <button onClick={() => {
+            setPage("daily");
+            setShowResult(false);
+            setAnswer("");
+           }}>
+
             📘 Ежедневные задания
           </button>
 
@@ -190,9 +205,9 @@ export default function App() {
           <h2>Ежедневное задание</h2>
 
           <p>
-            Укажите, поставьте знак ударения в следующих словах
-            (в поле ответа запишите последовательность полученных
-            ударных букв без знаков препинания, например: ЕОИ)
+            Поставьте знак ударения в следующих словах 
+(в поле ответа запишите последовательность полученных ударных букв без знаков препинания, например: ЕОИ)
+
           </p>
 
           <p style={{ fontWeight: "bold" }}>
@@ -205,7 +220,28 @@ export default function App() {
             placeholder="Введите ответ"
           />
 
-          <button onClick={checkAnswer}>Проверить</button>
+          {!showResult && (
+  <button onClick={checkAnswer}>Проверить</button>
+)}
+{showResult && (
+  <div style={{
+    marginTop: 20,
+    padding: 15,
+    borderRadius: 12,
+    background: "#ffffffaa"
+  }}>
+    {isCorrect ? (
+      <p style={{ color: "green" }}>
+        ✅ Верно! +1 очко
+      </p>
+    ) : (
+      <p style={{ color: "red" }}>
+        ❌ Неверно. Правильный ответ: {CORRECT_ANSWER}
+      </p>
+    )}
+  </div>
+)}
+
         </>
       )}
 
