@@ -18,33 +18,34 @@ export default function App() {
 
   // Загрузка пользователя
   useEffect(() => {
-    const init = async () => {
-      WebApp.ready();
-      WebApp.expand();
-      const user = WebApp.initDataUnsafe?.user;
-      if (!user) return;
-      setTgUser(user);
+  const init = async () => {
+    WebApp.ready();
+    WebApp.expand();
+    const user = WebApp.initDataUnsafe?.user;
+    if (!user) return;
+    setTgUser(user);
 
-      const { data } = await supabase
-        .from("users")
-        .select("*")
-        .eq("telegram_id", user.id)
-        .single();
+    // Проверяем есть ли пользователь в базе
+    const { data } = await supabase
+      .from("users")
+      .select("*")
+      .eq("telegram_id", user.id)
+      .single();
 
-      if (data) {
-        setSavedNick(data.nickname);
-        setScore(data.score);
-      }
+    if (data) {
+      setSavedNick(data.nickname);
+      setScore(data.score);
+    }
 
-      // Загрузка топа
-      await loadTopPlayers();
-      // Загрузка всех заданий
-      await loadTasks();
+    // Загрузка топа и всех заданий
+    await loadTopPlayers();
+    await loadTasks();
 
-      setLoading(false);
-    };
-    init();
-  }, []);
+    setLoading(false);
+  };
+  init();
+}, []);
+
 
   const loadTopPlayers = async () => {
     const { data, error } = await supabase
