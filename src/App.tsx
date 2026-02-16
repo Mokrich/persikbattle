@@ -70,7 +70,7 @@ export default function App() {
 
   // ===== LOAD TASKS =====
   const loadTasks = async () => {
-    const { data, error } = await supabase.from("tasks").select("*");
+    const { data, error } = await supabase.from("Zadanie").select("*");
 
     console.log("TASKS FROM DB:", data);
     console.log("ERROR:", error);
