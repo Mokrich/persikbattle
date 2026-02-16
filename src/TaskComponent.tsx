@@ -9,7 +9,7 @@ export interface Task {
 
 interface Props {
   task: Task;
-  onAnswered: () => void;
+  onAnswered: (isCorrect: boolean) => void;
 }
 
 export default function TaskComponent({ task, onAnswered }: Props) {
@@ -18,6 +18,7 @@ export default function TaskComponent({ task, onAnswered }: Props) {
 
   const [selected, setSelected] = useState<string[]>(wordsArray.map(() => ""));
   const [showAnswer, setShowAnswer] = useState(false);
+  const [isCorrect, setIsCorrect] = useState<boolean | null>(null);
 
   const vowels = "аеёиоуыэюя";
 
@@ -25,7 +26,6 @@ export default function TaskComponent({ task, onAnswered }: Props) {
     if (showAnswer) return;
 
     const char = wordsArray[wordIndex][charIndex];
-
     if (!vowels.includes(char.toLowerCase())) return;
 
     const newSelected = [...selected];
@@ -34,11 +34,26 @@ export default function TaskComponent({ task, onAnswered }: Props) {
   };
 
   const handleCheck = () => {
+    let correct = true;
+
+    wordsArray.forEach((word, i) => {
+      const correctWord = correctArray[i];
+
+      const correctLetter = correctWord
+        .split("")
+        .find(ch => ch === ch.toUpperCase());
+
+      if (selected[i] !== correctLetter?.toLowerCase()) {
+        correct = false;
+      }
+    });
+
+    setIsCorrect(correct);
     setShowAnswer(true);
   };
 
   const handleNext = () => {
-    onAnswered();
+    onAnswered(isCorrect === true);
   };
 
   return (
@@ -53,16 +68,14 @@ export default function TaskComponent({ task, onAnswered }: Props) {
             let displayChar = ch;
             let color = "black";
 
-            if (selected[i] === ch && !showAnswer) {
+            if (!showAnswer && selected[i] === ch) {
               displayChar = ch.toUpperCase();
               color = "orange";
             }
 
             if (showAnswer) {
               const correctWord = correctArray[i];
-              const correctChar = correctWord[ci];
-
-              if (correctChar === correctChar.toUpperCase()) {
+              if (correctWord[ci] === correctWord[ci].toUpperCase()) {
                 displayChar = ch.toUpperCase();
                 color = "green";
               }
@@ -76,7 +89,10 @@ export default function TaskComponent({ task, onAnswered }: Props) {
                   cursor: isVowel && !showAnswer ? "pointer" : "default",
                   marginRight: 2,
                   color,
-                  fontWeight: displayChar === displayChar.toUpperCase() ? "bold" : "normal"
+                  fontWeight:
+                    displayChar === displayChar.toUpperCase()
+                      ? "bold"
+                      : "normal"
                 }}
               >
                 {displayChar}
@@ -87,31 +103,20 @@ export default function TaskComponent({ task, onAnswered }: Props) {
       ))}
 
       {!showAnswer && (
-        <button
-          onClick={handleCheck}
-          style={{
-            marginTop: 20,
-            padding: "12px 30px",
-            fontSize: 18,
-            borderRadius: 20
-          }}
-        >
+        <button onClick={handleCheck}>
           Проверить
         </button>
       )}
 
       {showAnswer && (
-        <button
-          onClick={handleNext}
-          style={{
-            marginTop: 20,
-            padding: "12px 30px",
-            fontSize: 18,
-            borderRadius: 20
-          }}
-        >
-          Следующее задание →
-        </button>
+        <>
+          <h3>
+            {isCorrect ? "✅ Верно!" : "❌ Неверно"}
+          </h3>
+          <button onClick={handleNext}>
+            Следующее задание →
+          </button>
+        </>
       )}
     </div>
   );

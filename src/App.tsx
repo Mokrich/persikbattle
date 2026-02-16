@@ -117,9 +117,10 @@ export default function App() {
   };
 
   // ===== AFTER ANSWER =====
-  const handleAnswered = async () => {
-    if (!tgUser) return;
+  const handleAnswered = async (isCorrect: boolean) => {
+  if (!tgUser) return;
 
+  if (isCorrect) {
     const newScore = score + 1;
 
     await supabase
@@ -128,11 +129,13 @@ export default function App() {
       .eq("telegram_id", tgUser.id);
 
     setScore(newScore);
-    await loadTopPlayers();
+  }
 
-    // следующее задание
-    nextTask();
-  };
+  await loadTopPlayers();
+
+  nextTask();
+};
+;
 
   // ===== LOADING =====
   if (loading) {
