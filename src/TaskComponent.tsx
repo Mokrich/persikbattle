@@ -4,7 +4,6 @@ export interface Task {
   id: number;
   words: string;
   correct: string;
-  used: boolean;
   type: number;
 }
 
@@ -16,54 +15,102 @@ interface Props {
 export default function TaskComponent({ task, onAnswered }: Props) {
   const wordsArray = task.words.split(",").map(w => w.trim());
   const correctArray = task.correct.split(",").map(c => c.trim());
+
   const [selected, setSelected] = useState<string[]>(wordsArray.map(() => ""));
-  const [answered, setAnswered] = useState(false);
+  const [showAnswer, setShowAnswer] = useState(false);
+
+  const vowels = "аеёиоуыэюя";
 
   const handleClick = (wordIndex: number, charIndex: number) => {
-    if (answered) return;
+    if (showAnswer) return;
 
-    const chars = wordsArray[wordIndex].split("");
-    const char = chars[charIndex];
+    const char = wordsArray[wordIndex][charIndex];
 
-    // Заменяем в выбранном массиве
+    if (!vowels.includes(char.toLowerCase())) return;
+
     const newSelected = [...selected];
-    newSelected[wordIndex] = char.toUpperCase(); // показываем ударную букву заглавной
+    newSelected[wordIndex] = char;
     setSelected(newSelected);
   };
 
-  const handleSubmit = () => {
-    setAnswered(true);
+  const handleCheck = () => {
+    setShowAnswer(true);
+  };
+
+  const handleNext = () => {
     onAnswered();
   };
 
   return (
     <div style={{ marginTop: 30 }}>
-      <h2>Поставьте знак ударения в следующих словах</h2>
+      <h2>Поставьте ударение:</h2>
+
       {wordsArray.map((word, i) => (
-        <div key={i} style={{ margin: "10px 0", fontSize: 24 }}>
+        <div key={i} style={{ fontSize: 26, margin: "15px 0" }}>
           {word.split("").map((ch, ci) => {
-            const isVowel = "аеёиоуыэюяАЕЁИОУЫЭЮЯ".includes(ch.toLowerCase());
-            const display = selected[i] && ci === word.indexOf(selected[i].toLowerCase()) ? selected[i] : ch;
+            const isVowel = vowels.includes(ch.toLowerCase());
+
+            let displayChar = ch;
+            let color = "black";
+
+            if (selected[i] === ch && !showAnswer) {
+              displayChar = ch.toUpperCase();
+              color = "orange";
+            }
+
+            if (showAnswer) {
+              const correctWord = correctArray[i];
+              const correctChar = correctWord[ci];
+
+              if (correctChar === correctChar.toUpperCase()) {
+                displayChar = ch.toUpperCase();
+                color = "green";
+              }
+            }
+
             return (
               <span
                 key={ci}
-                onClick={() => isVowel && handleClick(i, ci)}
+                onClick={() => handleClick(i, ci)}
                 style={{
-                  cursor: isVowel ? "pointer" : "default",
+                  cursor: isVowel && !showAnswer ? "pointer" : "default",
                   marginRight: 2,
-                  fontWeight: display === display.toUpperCase() ? "bold" : "normal",
-                  color: display === display.toUpperCase() ? "red" : "black",
+                  color,
+                  fontWeight: displayChar === displayChar.toUpperCase() ? "bold" : "normal"
                 }}
               >
-                {display}
+                {displayChar}
               </span>
             );
           })}
         </div>
       ))}
-      {!answered && (
-        <button onClick={handleSubmit} style={{ marginTop: 20, padding: "10px 30px", fontSize: 20, borderRadius: 20 }}>
+
+      {!showAnswer && (
+        <button
+          onClick={handleCheck}
+          style={{
+            marginTop: 20,
+            padding: "12px 30px",
+            fontSize: 18,
+            borderRadius: 20
+          }}
+        >
           Проверить
+        </button>
+      )}
+
+      {showAnswer && (
+        <button
+          onClick={handleNext}
+          style={{
+            marginTop: 20,
+            padding: "12px 30px",
+            fontSize: 18,
+            borderRadius: 20
+          }}
+        >
+          Следующее задание →
         </button>
       )}
     </div>
