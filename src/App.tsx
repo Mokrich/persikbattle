@@ -90,11 +90,11 @@ export default function App() {
 
   // Выбираем следующее задание
   const nextTask = (taskList: Task[] = tasks) => {
-    const remaining = taskList.filter(t => !t.used);
-    if (remaining.length === 0) return alert("Все задания пройдены!");
-    const t = remaining[Math.floor(Math.random() * remaining.length)];
-    setCurrentTask(t);
+  if (taskList.length === 0) return alert("Нет заданий!");
+  const t = taskList[Math.floor(Math.random() * taskList.length)];
+  setCurrentTask(t);
   };
+
 
   // Обработка ответа
   const handleAnswered = async () => {
@@ -106,7 +106,6 @@ export default function App() {
     setScore(newScore);
 
     // Помечаем задание как использованное
-    await supabase.from("tasks").update({ used: true }).eq("id", currentTask.id);
     const updatedTasks = tasks.map(t => (t.id === currentTask.id ? { ...t, used: true } : t));
     setTasks(updatedTasks);
 
